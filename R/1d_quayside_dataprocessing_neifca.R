@@ -17,22 +17,11 @@ colnames(quayside_data_ind_lobster) <- quayside_data_ind_lobster |>
   janitor::clean_names() |> 
   colnames() 
 
-quayside_data_ind_crab <- readr::read_csv(file = "data/neifca/raw/quayside_crab.csv") |> 
-  dplyr::glimpse() 
-colnames(quayside_data_ind_crab) <- quayside_data_ind_crab |> 
-  janitor::clean_names() |> 
-  colnames() 
-
 # data cleaning
 quayside_data_ind_lobster <- quayside_data_ind_lobster |> 
   dplyr::mutate(date = as.Date(date, format = "%d/%m/%Y")) |> 
   dplyr::mutate(sex = dplyr::recode(sex, F=1, M=0, m=0, f=1, "M/F"=2, "#M"=0, "M \xa0"=0, "F \xa0"=1, "\xa0M"=0, "\xa0F"=1)) |> # recode sex
   dplyr::mutate(size = as.numeric(size)) 
   
-quayside_data_ind_crab <- quayside_data_ind_crab |> 
-  dplyr::mutate(date = as.Date(date, format = "%d/%m/%Y")) |>
-  dplyr::mutate(sex = dplyr::recode(sex, F=1, M=0))
-
 # export output as csv
 readr::write_csv(quayside_data_ind_lobster, file = "processed_data/neifca/quayside_data_ind_lobster_neifca_clean.csv") 
-readr::write_csv(quayside_data_ind_crab, file = "processed_data/neifca/quayside_data_ind_crab_neifca_clean.csv") 
