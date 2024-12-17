@@ -1,5 +1,4 @@
 # script for data cleaning for the observer datasets. - North Eastern IFCA
-# created: 6/10/2024 by Daisuke Goto (d.goto@bangor.ac.uk)
 
 # Check if required packages are installed
 required <- c("readr", "dplyr", "lubridate", "tidyr", "janitor")
@@ -78,7 +77,6 @@ observer_data_vessel <- observer_data_vessel |>
   octopusN=octopus, portunusN=portunus, shore_crabN=shore_crab, 
   squatlobsterN=squatlobster, whelkN=whelk, wrasseN=wrasse, 
   sea_urchinN=sea_urchin, hermitN = hermit)
-
 observer_data_lobster <- data.table::rbindlist(list(observer_data_measure_lobster22, observer_data_measure_lobster23))
 
 # data cleaning
@@ -107,7 +105,7 @@ observer_data_lobster <- observer_data_lobster |>
   dplyr::mutate(qtr = lubridate::quarter(date, with_year = FALSE)) |> 
   tidyr::unite(qrt.yr, c(year, qtr), sep = "-", remove = FALSE) |> 
   tidyr::unite(trip, c(vessel, date), sep = "|", remove = FALSE) 
-
+  
 # export output as csv
 readr::write_csv(observer_data_vessel, file = "processed_data/neifca/observer_data_vessel_neifca_clean.csv") 
 readr::write_csv(observer_data_lobster, file = "processed_data/neifca/observer_data_lobster_neifca_clean.csv")

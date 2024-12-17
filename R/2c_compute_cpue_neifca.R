@@ -18,18 +18,40 @@ observer_data_vessel <- readr::read_csv("processed_data/neifca/observer_data_ves
   dplyr::glimpse()
 observer_data_lobster <- readr::read_csv("processed_data/neifca/observer_data_lobster_neifca_clean.csv") |> 
   dplyr::glimpse()
+observer_data_crab <- readr::read_csv("processed_data/neifca/observer_data_crab_neifca_clean.csv") |> 
+  dplyr::glimpse()
 observer_data_env <- readr::read_csv("processed_data/neifca/observer_data_env_neifca_clean.csv") |> 
   dplyr::glimpse()
 colnames(observer_data_env)[17] <- "cl"
 colnames(observer_data_env)[4] <- "fleet"
 
+
+
+
+# merge observer datasets
+# observer_data_vessel_sub <- observer_data_vessel |>
+#   dplyr::group_by(trip) |>
+#   dplyr::reframe(pots = mean(pots))
+# observer_data_lobster <- observer_data_lobster |> 
+#   dplyr::select(-pots) |>
+#   dplyr::left_join(observer_data_vessel_sub)
+# observer_data_crab <- observer_data_crab |> 
+#   dplyr::select(-pots) |>
+#   dplyr::left_join(observer_data_vessel_sub)
+
 # merge datasets w/ habitat data
 observer_data_lobster <- observer_data_env |> 
   dplyr::filter(species == "Lobster")
+observer_data_crab <- observer_data_env |> 
+  dplyr::filter(species == "Crab")
 
 # convert length to mass (the same equations used for the welsh stocks)
 observer_data_lobster <- observer_data_lobster |> 
   dplyr::mutate(sample_mass_kg = 4.36E-07*cl^3.10753)
+observer_data_crab <- observer_data_crab |> 
+  dplyr::mutate(sample_mass_kg = dplyr::case_when(sex == 0 ~ 0.0002*cl^3.03/1000,    
+                                                  sex == 1 ~ 0.0002*cl^2.94/1000))
+
 
 # function to compute nominal catch, landings, cpue, and lpue per fishing trip 
 compute_cpue.lpue <- function(data) {
@@ -46,7 +68,6 @@ compute_cpue.lpue <- function(data) {
     dplyr::group_by(date, fleet, vessel_length) |> 
     dplyr::reframe(nominal.effort = sum(nominal.effort, na.rm = TRUE),
                    vessel_length = unique(vessel_length)) 
-  
   
   # compute total catch (kg) per trip
   observer_data_catch <- data |> 
@@ -166,24 +187,36 @@ compute_cpue.lpue <- function(data) {
 
 # apply the function to each stock
 observer_data_lobster_out <- compute_cpue.lpue(observer_data_lobster) # lobster
+observer_data_crab_out <- compute_cpue.lpue(observer_data_crab) # crab
 
 # apply the function to each stock for under 10m
 observer_data_lobster_u10 <- observer_data_lobster |> dplyr::filter(vessel_length <= 10)
+observer_data_crab_u10 <- observer_data_crab |> dplyr::filter(vessel_length <= 10)
 observer_data_lobster_out_u10 <- compute_cpue.lpue(observer_data_lobster_u10) # lobster
+observer_data_crab_out_u10 <- compute_cpue.lpue(observer_data_crab_u10) # crab
 
 # export output as rds (as a list)
 readr::write_rds(observer_data_lobster_out, file = "processed_data/neifca/observer_data_lobster_nominal.cpue_new.rds") # lobster
+readr::write_rds(observer_data_crab_out, file = "processed_data/neifca/observer_data_crab_nominal.cpue_new.rds") # crab
 
 # export output as csv
 readr::write_csv(observer_data_lobster_out[[1]], file = "processed_data/neifca/observer_data_lobster_nominal.cpue_trip_new.csv") 
+readr::write_csv(observer_data_crab_out[[1]], file = "processed_data/neifca/observer_data_crab_nominal.cpue_trip_new.csv")
 readr::write_csv(observer_data_lobster_out[[2]], file = "processed_data/neifca/observer_data_lobster_nominal.cpue_potset_new.csv") 
+readr::write_csv(observer_data_crab_out[[2]], file = "processed_data/neifca/observer_data_crab_nominal.cpue_potset_new.csv")
+
 
 # compute cpue for survey data
+#survey_data_effort <- readr::read_csv("processed_data/neifca/survey_data_effort_neifca_clean.csv") |> dplyr::glimpse()
 survey_data_lobster <- readr::read_csv("processed_data/neifca/survey_data_lobster_neifca_clean.csv") |> dplyr::glimpse()
-
+survey_data_crab <- readr::read_csv("processed_data/neifca/survey_data_crab_neifca_clean.csv") |> dplyr::glimpse()
+ 
 # convert length to mass (the same equations used for the welsh stocks)
 survey_data_lobster <- survey_data_lobster |>
   dplyr::mutate(sample_mass_kg = 4.36E-07*carapace_len^3.10753)
+survey_data_crab <- survey_data_crab |>
+  dplyr::mutate(sample_mass_kg = dplyr::case_when(sex == 0 ~ 0.0002*carapace_len^3.03/1000,
+                                                  sex == 1 ~ 0.0002*carapace_len^2.94/1000))
 
 # function to compute cpue for survey data
 compute_cpue_survey <- function(data) {
@@ -195,28 +228,34 @@ compute_cpue_survey <- function(data) {
     dplyr::reframe(year = unique(year),
                    month = unique(month),
                    nominal.catch = sum(sample_mass_kg, na.rm = TRUE),
-                   nominal.effor = 15,
+                   nominal.effort = 15,
                    nominal.cpue = nominal.catch/15)
   return(survey_data_cpue)
 }
 
 # apply the function to each stock
 survey_data_lobster_out <- compute_cpue_survey(survey_data_lobster) # lobster
+survey_data_crab_out <- compute_cpue_survey(survey_data_crab) # crab
 
 # export output as csv
 readr::write_csv(survey_data_lobster_out, file = "processed_data/neifca/survey_data_lobster_nominal.cpue_trip.csv") 
+readr::write_csv(survey_data_crab_out, file = "processed_data/neifca/survey_data_crab_nominal.cpue_trip.csv")
+
 
 # plot output
 # temporal variation
 # select a dataset and a parameter
-data <- observer_data_lobster_out[[1]]
+data <- survey_data_lobster_out
 response <- data$nominal.cpue
 response.name <- "nominal catch rate (kg per number of pots hauled)"
 
 mycolors <- c(RColorBrewer::brewer.pal(name = "Paired", n = 12), 
               RColorBrewer::brewer.pal(name = "Set3", n = 7))
-(plot1<- data |> ggplot2::ggplot(ggplot2::aes(lubridate::quarter(date, with_year = TRUE), response, 
-                                     group = lubridate::quarter(date, with_year = TRUE))) +
+(plot1<- data |> 
+    #ggplot2::ggplot(ggplot2::aes(lubridate::quarter(date, with_year = TRUE), response, 
+    #                             group = lubridate::quarter(date, with_year = TRUE))) +
+    ggplot2::ggplot(ggplot2::aes(year, response, 
+                                 group = month)) +
   ggplot2::scale_color_manual(values = mycolors) +
   ggplot2::geom_boxplot(outlier.shape = NA) +
   ggplot2::geom_jitter(size = 2., ggplot2::aes(lubridate::quarter(date, with_year = TRUE), response,
@@ -246,13 +285,20 @@ mycolors <- c(RColorBrewer::brewer.pal(name = "Paired", n = 12),
   ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 3))))
 
 # export plot
-ggplot2::ggsave(file=paste0("plots/neifca/", response.name, "_observer_trends_neifca.svg"), plot=plot1, width=12, height=8)
+ggplot2::ggsave(file=paste0("plots/neifca/", response.name, "_observer_trends_neifca.svg"), 
+                plot=plot1, width=12, height=8)
+
 
 # spatial distribution
 # select a dataset and a parameter
 data <- observer_data_lobster_out[[2]]
 response <- data$nominal.cpue_potset
 response.name <- "nominal cpue (kg per number of pots hauled)"
+
+#wales <- rgdal::readOGR(dsn = "data/wales/wnmp_areas/wnmp_areas.shp", stringsAsFactors = FALSE)
+#wales <- rgdal::readOGR(dsn = "data/wales/wnmp_general_policies/wnmp_general_policies.shp", stringsAsFactors = FALSE)
+#world.coast <- rgdal::readOGR(dsn = file.path(getwd(), "data/ne_110m_coastline"), layer = "ne_110m_coastline")
+#world.coast <- sp::spTransform(world.coast, sp::CRS("+proj=longlat +datum=WGS84"))
 xlim <- c(min(data$longitude, na.rm = TRUE) - 0.9 * 5, 
           max(data$longitude, na.rm = TRUE) * 2.5)
 ylim <- c(min(data$latitude, na.rm = TRUE) * 0.95, 

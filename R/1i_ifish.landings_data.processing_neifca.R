@@ -1,4 +1,4 @@
-# script for extracting monthly landings data from the MMO IFISH dataset - North Easter IFCA
+# script for extracting monthly lobster landings data from the MMO IFISH dataset - North Easter IFCA
 
 # check if required packages are installed
 required <- c("readr", "dplyr", "lubridate", "tidyr", "RColorBrewer", "rgdal", "sp", 
@@ -8,11 +8,11 @@ installed <- rownames(installed.packages())
 install.packages(not_installed, dependencies=TRUE)
 
 # read in data
+license.history_data <- readr::read_csv(file = "data/FISP_license_history_anon.csv") |> 
+  dplyr::glimpse()
 # vessel license history
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 setwd("..")
-license.history_data <- readr::read_csv(file = "data/FISP_license_history_anon.csv")
-dplyr::glimpse(license.history_data)
 
 # ifish landings: 2008-2022 (files in each folder have different data structures)
 files1 <- list.files(path="data/mmo_landings_published.data/2008_2012", pattern=".csv$")
@@ -57,7 +57,8 @@ colnames(allmyData3)[4] <- "fao_area"
 colnames(allmyData3)[9] <- "species"
 
 # merge all landings datasets
-ifish_landings <- data.table::rbindlist(list(allmyData1, allmyData2, allmyData3))|> dplyr::glimpse()
+ifish_landings <- data.table::rbindlist(list(allmyData1, allmyData2, allmyData3)) |> 
+  dplyr::glimpse()
 
 # subset neifca landings
 ices_rec <- readr::read_delim(file = "data/neifca/ices_rectangles_england.csv") |> 
@@ -88,14 +89,14 @@ ifish_landings_neifca_lobster <- ifish_landings_neifca |>
   dplyr::filter(species %in% c("Lobsters" )) |> 
   dplyr::filter((gear_category == "Pots and traps"))
 
-# bycatch (crabs and lobsters not caught by pots and traps)
+# bycatch
 ifish_landings_neifca_lobster_bycatch <- ifish_landings_neifca |> 
   dplyr::filter(species %in% c("Lobsters" )) |> 
   dplyr::filter(!(gear_category == "Pots and traps"))
 
 # export output as csv
-readr::write_csv(ifish_landings_neifca_lobster, file = "processed_data/wales/ifish_landings_neifca_lobster_clean.csv") 
-readr::write_csv(ifish_landings_neifca_lobster_bycatch, file = "processed_data/wales/ifish_landings_neifca_lobster_bycatch_clean.csv") 
+readr::write_csv(ifish_landings_neifca_lobster, file = "processed_data/neifca/ifish_landings_neifca_lobster_clean.csv") 
+readr::write_csv(ifish_landings_neifca_lobster_bycatch, file = "processed_data/neifca/ifish_landings_neifca_lobster_bycatch_clean.csv") 
 
 # aggregate by year
 ifish_landings_neifca_lobster_annual <- ifish_landings_neifca_lobster |> 
@@ -147,8 +148,6 @@ mycolors = c(RColorBrewer::brewer.pal(name = "Paired", n = 12),
       strip.text.x = ggplot2::element_text(size = 10, colour = "darkblue")) +  
     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 3))))
 
-# export plot
-ggplot2::ggsave(file=paste0("plots/neifca/", response.name, "_ifish_trends_neifca.svg"), plot=plot1, width=12, height=8)
 
 # spatial variation
 data <- ifish_landings_neifca_lobster_annual
@@ -201,11 +200,8 @@ class(world)
                         strip.position = "top", 
                         ncol = 5))
 
-# export plot
-ggplot2::ggsave(file=paste0("plots/neifca/", response.name, "_ifish_ices.rec_neifca.svg"), plot=plot2, width=12, height=8)
 
 # reformat datasets for ss
-# load landings data from published ifish datasets
 ifish_landings_neifca_lobster <- ifish_landings_neifca_lobster |>
   dplyr::mutate(length_group = dplyr::case_when(length_group == "10m&Under" ~ "10m&Under", 
                                                 length_group == "Over10m" ~ "Over10m", 
@@ -227,15 +223,27 @@ ifish_bycatch_neifca_lobster <- ifish_bycatch_neifca_lobster |>
 
 # Catch data: yr, season, fleet, catch, catch_se
 data_lobster <- ifish_landings_neifca_lobster |>
-  dplyr::mutate(length_group = dplyr::case_when(length_group == "10m&Under" ~ 1, 
-                                                length_group == "Over10m" ~ 2),
-                catch.se = 0.05)
+  dplyr::group_by(year) |> #
+  dplyr::reframe(year = unique(year),
+                 quarter = max(qtr),
+                 fleet = 4,
+                 landing = sum(landing),
+                 catch.se = 0.05) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(catch.se = sd(landing)/mean(landing)) |>
+  dplyr::glimpse()
 
 # bycatch
 data_lobster_bycatch <- ifish_bycatch_neifca_lobster |> 
-  dplyr::mutate(length_group = dplyr::case_when(length_group == "10m&Under" ~ 1, 
-                                                length_group == "Over10m" ~ 2),
-                catch.se = 0.05)
+  dplyr::group_by(year) |> #
+  dplyr::reframe(year = unique(year),
+                 quarter = max(qtr),
+                 fleet = 5,
+                 landing = sum(landing),
+                 catch.se = 0.05) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(catch.se = sd(log(landing))/mean(log(landing))) |>
+  dplyr::glimpse()
 
 # export datasets
 readr::write_csv(data_lobster, file = "processed_data/neifca/landing.data_lobster_neifca_ss.csv") 
